@@ -1,0 +1,10 @@
+{
+  "name": "TWiST",
+  "version": "0.0.0",
+  "dependencies": {
+    "react": "~0.13.3",
+    "qwest": "~1.7.0",
+    "base64": "~0.3.0",
+    "react-widgets": "~2.7.2"
+  }
+}
