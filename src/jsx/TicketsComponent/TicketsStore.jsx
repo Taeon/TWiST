@@ -27,6 +27,23 @@ module.exports = Reflux.createStore({
         );
         setInterval( this.UpdateTickets.bind( this ), 30000 );
     },
+    ClaimTicket:function( id ) {
+        ApplicationStore.getData().teamwork_desk_api.GetTicket( 
+            id
+        ).then(
+            function( data ){
+                data.ticket.assignedTo = ApplicationStore.getData().user_account.userId;
+                ApplicationStore.getData().teamwork_desk_api.UpdateTicket( 
+                    id,
+                    data.ticket
+                ).then(
+                    function(){
+                        this.UpdateTickets();
+                    }.bind( this )
+                );
+            }.bind(this)
+        );
+    },
     UpdateTickets:function() {
         ApplicationActions.GetTicketsMine(
             {

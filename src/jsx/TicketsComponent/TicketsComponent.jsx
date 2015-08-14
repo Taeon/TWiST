@@ -1,13 +1,18 @@
-/** @jsx React.DOM */
-
 var React   = require('react');
 var Reflux   = require('reflux');
 
 var TicketsStore = require( './TicketsStore' );
 var TicketsActions = require( './TicketsActions' );
 
+var TimeStore = require( '../TimeComponent/TimeStore' );
+
+
 var ApplicationActions = require( '../Application/ApplicationActions' );
 var ApplicationStore = require( '../Application/ApplicationStore' );
+
+var TicketToTaskAddComponent = require( '../TicketToTaskAddComponent/TicketToTaskAddComponent' );
+
+var Modal = require( '../ModalComponent/ModalComponent' );
 
 var TicketsComponent = React.createClass({
 
@@ -27,8 +32,17 @@ var TicketsComponent = React.createClass({
 	getInitialState: function() {
         return TicketsStore;
 	},
-	_CreateTask:function(){
-		console.log(arguments);
+	_CreateTask:function( id ){
+		TicketsStore.setState
+		( 
+			{
+				show_ticket_form:true,
+				current_ticket_id:id
+			}
+		);
+	},
+	_ClaimTicket:function( id ){
+		TicketsActions.ClaimTicket( id );
 	},
 	_Reload:function(){
 		TicketsStore.UpdateTickets();
@@ -36,8 +50,24 @@ var TicketsComponent = React.createClass({
 	_CurrentlyShowingChange:function( type ){
 		TicketsActions.SetCurrentlyShowing( type );
 	},
+	_HideTicketForm:function(){
+		TicketsStore.setState( {show_ticket_form:false} );
+	},
 
 	render: function() {
+
+		var form = false;
+		if(TicketsStore.getState().show_ticket_form){
+			form = <Modal title="Create ticket" show={true} onClose={this._HideTicketForm}>
+			  <TicketToTaskAddComponent 
+			  	ticket_id={TicketsStore.getState().current_ticket_id}
+			  	onSubmit={function(){this._HideTicketForm();}.bind(this)}
+			  />
+			</Modal>
+			;				
+		}
+
+
 		var content;
 		if( TicketsStore.getState().status == TicketsStore.STATE_LOADING  ){
 			content = <div className="waiting">...</div>;
@@ -51,12 +81,19 @@ var TicketsComponent = React.createClass({
 			} else {
 				inner_content = <div className="tickets-items">{tickets.map(
 					function (item, idx) {
+
+						var claim_button = null;
+						if( TicketsStore.getState().currently_showing == 'unassigned' ){
+							claim_button = <button onTouchTap={this._ClaimTicket.bind(this, item.id)} className="material-icons">reply</button>;
+						}
+
 						return <div className={"item ticket " + ((item.priority != '')?this.priority_class_names[ item.priority.toLowerCase() ]:'priority-none')}
 							key={idx}>
 								<div className="title"><a href={ApplicationStore.getData().user_account.URL + 'desk/#/tickets/' + item['id']} target="teamwork-desk">{item.subject}</a></div>
 								<div className="details">{item.customer.firstName} {item.customer.lastName}</div>
 				        		<div className="buttons">
-					        		<button onTouchTap={this._CreateTask.bind(this, item.id)} className="material-icons">access_time</button>
+					        		{claim_button}
+					        		<button onTouchTap={this._CreateTask.bind(this, item.id)} className="material-icons" title="Create task">toc</button>
 					        	</div>
 							</div>;
 					}.bind(this)
@@ -88,6 +125,7 @@ var TicketsComponent = React.createClass({
 					<div className="buttons"><button className="material-icons" onTouchTap={this._Reload}>replay</button></div>
 				</div>
 				{content}
+				{form}
 			</div>
 		);
 	}

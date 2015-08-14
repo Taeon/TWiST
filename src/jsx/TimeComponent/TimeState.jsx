@@ -25,7 +25,8 @@ var State = {
             times: [],
             current_timed_task: null,
             current_timer_start_time: null,
-            show_add_form: false
+            show_add_form: false,
+            show_edit_form: false
         };
     },
 

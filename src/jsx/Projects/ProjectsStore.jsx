@@ -38,13 +38,7 @@ module.exports = Reflux.createStore({
                     ApplicationStore.getData().state == ApplicationStore.STATE_LOADED
                 ){
                     this.setState( {status:this.STATE_LOADING} );
-                    this.teamwork_api = new TeamworkAPI(
-                        data.api_key,
-                        {
-                            base_url:data.user_account.URL
-                        }
-                    );
-
+                    
                     ProjectsActions.GetProjects();
                 }
             }.bind(this)
@@ -69,7 +63,7 @@ module.exports = Reflux.createStore({
     },
 
     GetProjects:function(){
-        this.teamwork_api.GetProjects().then( this.onGetProjectsCompleted );
+        ApplicationStore.getData().teamwork_api.GetProjects().then( this.onGetProjectsCompleted );
     },
     
     /**

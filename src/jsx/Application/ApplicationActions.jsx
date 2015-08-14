@@ -13,10 +13,6 @@ var Actions = Reflux.createActions({
     'SetAPIKey':{children:["completed","failed"],asyncResult:true},
     'Logout':{},
 
-    'GetTasks':{children:["completed","failed"],asyncResult:true},
-    'GetTask':{children:["completed","failed"],asyncResult:true},
-    'SetTasksCompleted':{children:["completed","failed"],asyncResult:true},
-
     'GetTicketsMine':{children:["completed","failed"],asyncResult:true},
     'GetTicketsUnassigned':{children:["completed","failed"],asyncResult:true},
 
@@ -57,32 +53,6 @@ Actions.SetAPIKey.listen(
                 }.bind(this)
             }
         );
-    }
-);
-Actions.GetTasks.listen(
-    function( options ){
-        teamwork_api.GetTasks( options ).then( this.completed );
-    }
-);
-Actions.GetTask.listen(
-    function( id ){
-        teamwork_api.GetTask( id ).then( this.completed );
-    }
-);
-Actions.SetTasksCompleted.listen(
-    function( ids ){
-        var total = ids.length;
-        for( var i = 0; i < ids.length; i++ ){
-            teamwork_api.SetTaskCompleted( ids[ i ] ).then(
-                function(){
-                    total--;
-                    if( total <= 0 ){
-
-                        this.completed();
-                    }
-                }.bind(this)
-            );
-        }
     }
 );
 Actions.GetTicketsMine.listen(

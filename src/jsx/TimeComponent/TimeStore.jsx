@@ -154,7 +154,7 @@ module.exports = Reflux.createStore({
         LocalStorageStore.Delete( 'current_timer' );
     },
     DeleteTimeEntry:function( time_entry_id ){
-if( confirm( 'Delete?' ) ){
+if( confirm( 'Are you sure you want to delete this time entry?' ) ){
         ApplicationActions.DeleteTimeEntry( time_entry_id ).then( this.UpdateTimes.bind(this) );
 }
 

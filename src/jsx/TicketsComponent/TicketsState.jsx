@@ -27,7 +27,8 @@ var State = {
             status: STATE_UNINITIALIZED,
             tickets_mine: [],
             tickets_unassigned: [],
-            currently_showing: this.TICKETS_MINE
+            currently_showing: this.TICKETS_MINE,
+            show_show_ticket_form:false
         };
     },
 

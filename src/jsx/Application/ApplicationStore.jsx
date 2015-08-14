@@ -9,6 +9,7 @@ var Reflux = require('reflux'),
 var LocalStorageMixin = require('react-localstorage');
     
 var TeamworkAPI = require('../../../bower_components/teamwork-api/src/teamwork-api');
+var TeamworkDeskAPI = require('../../../bower_components/teamwork-api/src/teamwork-desk-api');
 
 // Some constants for determining state; will be exported on store too
 var
@@ -53,7 +54,9 @@ module.exports = Reflux.createStore({
             {
                 state: STATE_LOADED,
                 api_key: api_key,
-                user_account: account
+                user_account: account,
+                teamwork_api: new TeamworkAPI( api_key, { base_url: account.URL } ),
+                teamwork_desk_api: new TeamworkDeskAPI( api_key, { base_url: account.URL } )
             }
         );
         // Store API key for next time
@@ -76,27 +79,9 @@ module.exports = Reflux.createStore({
         return JSON.parse( JSON.stringify( base_state ) );
     },
 
-    SwitchToTwist:function(){
-        this.setState( {currently_showing:'twist'} );
-    },
-    SwitchToTeamwork:function( url ){
-        this.setState( {currently_showing:'teamwork'} );
-        if( typeof url != 'undefined' ){
-            ApplicationActions.SetTeamworkURL( this.getData().user_account.URL + url );
-        }
-    },
     SetTeamworkURL:function( url ){
         this.setState( { current_teamwork_url: url } );
     },
-    // SwitchToTeamworkDesk:function( url ){
-    //     this.setState( {currently_showing:'teamwork-desk'} );
-    //     if( typeof url != 'undefined' ){
-    //         ApplicationActions.SetTeamworkDeskURL( this.getData().user_account.URL + url );
-    //     }
-    // },
-    // SetTeamworkDeskURL:function( url ){
-    //     this.setState( { current_teamwork_desk_url: url } );
-    // },
     onLogout:function(){
         LocalStorageActions.ClearAPIKey();
         this.setState( this._getBaseState() );

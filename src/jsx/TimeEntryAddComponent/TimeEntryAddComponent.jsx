@@ -1,12 +1,8 @@
-/** @jsx React.DOM */
-
 var React   = require('react');
 var Reflux   = require('reflux');
 var moment   = require('moment');
 
 var ProjectsStore = require( '../Projects/ProjectsStore' );
-var TimeEntryAddStore = require( './TimeEntryAddStore' );
-var TimeEntryAddActions = require( '../TimeEntryAddComponent/TimeEntryAddActions' );
 
 var TimeActions = require( '../TimeComponent/TimeActions' );
 
@@ -36,7 +32,6 @@ var value = {
 };
 var TimeEntryAddComponent = React.createClass({
 
-	mixins: [Reflux.listenTo(TimeEntryAddStore,"onStatusChange")],
 	onStatusChange:function(){
 		this.forceUpdate();
 	},
@@ -45,7 +40,9 @@ var TimeEntryAddComponent = React.createClass({
     componentWillUnmount: function() {
     },
 	_HideAddForm:function(){
-		TimeEntryAddActions.HideForm();
+		if( typeof this.props.onHide == 'function' ){
+			this.props.onHide();
+		}
 	},
 	onSubmit:function(){
 
@@ -60,7 +57,10 @@ var TimeEntryAddComponent = React.createClass({
 		};
 
 		TimeActions.StartTimeEntryTimer( data );
-		this._HideAddForm();	
+		this._HideAddForm();
+		if( typeof this.props.onSubmit == 'function' ){
+			this.props.onSubmit();
+		}
 	},
 	onChange:function( new_values ){
 		for( var index in new_values ){
@@ -72,67 +72,54 @@ var TimeEntryAddComponent = React.createClass({
 	},
 	render: function() {
 
-		if( !TimeEntryAddStore.getState().show  ){
-		 	return false;
-		} else {
-
-			var companies = [];
-			var projects_by_company = {};
-			var projects = ProjectsStore.getState().projects;
-			for( var i = 0; i < projects.length; i++ ){
-				var project = projects[ i ];
-				project.company_name = project.company.name;
-				if( companies.indexOf( project.company.name ) === -1 ){
-					companies.push( project.company.name );
-					projects_by_company[ project.company.name ] = [];
-				}
-				projects_by_company[ project.company.name ].push( project );
+		var companies = [];
+		var projects_by_company = {};
+		var projects = ProjectsStore.getState().projects;
+		for( var i = 0; i < projects.length; i++ ){
+			var project = projects[ i ];
+			project.company_name = project.company.name;
+			if( companies.indexOf( project.company.name ) === -1 ){
+				companies.push( project.company.name );
+				projects_by_company[ project.company.name ] = [];
 			}
-			companies.sort();
-
-			return <div id="time-form-add">
-				<div>
-					<h2>Add new time entry</h2>
-					<div className="buttons"><button className="material-icons" onTouchTap={this._HideAddForm}>clear</button></div>
-					  <Form 
-					  className="cf"
-					  	ref = "myForm"
-					    schema={modelSchema}
-					    defaultValue={modelSchema.default()}
-					    onSubmit={this.onSubmit}
-					    value={value}
-					    onChange={this.onChange}
-					  >
-					    <div className="row">
-					      <label>Description</label>
-					      <Form.Field name='description' className="text"/>
-					      <Form.Message for='description'/>
-					    </div>
-					    <div className="row">
-						    <label>Project</label>
-
-							<Combobox 
-							      data={projects}
-							      defaultValue=''
-							      textField='name' 
-							      valueField='id'
-							      groupBy='company_name'
-							      onChange={function(project){if(typeof project == 'object' ){this.onChange({project_id:project.id})}}.bind(this)}
-							      filter='contains'
-							      />
-						    <Form.Message for='project_id'/>
-					    </div>
-					    <div className="row">
-						    <label>Billable</label>
-						    <Form.Field type="checkbox" name="billable" ref="myFormBillable" onChange={this.onBillableChange}/>
-						</div>
-					  <Form.Button type='submit' className="submit">Submit</Form.Button>
-					</Form>
-
-				</div>
-			</div>;
-
+			projects_by_company[ project.company.name ].push( project );
 		}
+		companies.sort();
+
+		return <Form 
+				  className="cf"
+				  	ref = "myForm"
+				    schema={modelSchema}
+				    defaultValue={modelSchema.default()}
+				    onSubmit={this.onSubmit}
+				    value={value}
+				    onChange={this.onChange}
+				  >
+				    <div className="row">
+				      <label>Description</label>
+				      <Form.Field name='description' className="text"/>
+				      <Form.Message for='description'/>
+				    </div>
+				    <div className="row">
+					    <label>Project</label>
+
+						<Combobox 
+						      data={projects}
+						      defaultValue=''
+						      textField='name' 
+						      valueField='id'
+						      groupBy='company_name'
+						      onChange={function(project){if(typeof project == 'object' ){this.onChange({project_id:project.id})}}.bind(this)}
+						      filter='contains'
+						      />
+					    <Form.Message for='project_id'/>
+				    </div>
+				    <div className="row">
+					    <label>Billable</label>
+					    <Form.Field type="checkbox" name="billable" ref="myFormBillable" onChange={this.onBillableChange}/>
+					</div>
+				  <Form.Button type='submit' className="submit">Submit</Form.Button>
+				</Form>;
 	}
 
 });

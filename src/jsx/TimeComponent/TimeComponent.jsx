@@ -1,5 +1,3 @@
-/** @jsx React.DOM */
-
 var React   = require('react');
 var Reflux   = require('reflux');
 var moment   = require('moment');
@@ -7,7 +5,10 @@ var moment   = require('moment');
 var TimeStore = require( './TimeStore' );
 var TimeActions = require( './TimeActions' );
 
-var TimeEntryAddActions = require( '../TimeEntryAddComponent/TimeEntryAddActions' );
+var TimeEntryAddComponent = require( '../TimeEntryAddComponent/TimeEntryAddComponent' );
+var TimeEntryEditComponent = require( '../TimeEntryEditComponent/TimeEntryEditComponent' );
+
+var TimerComponent = require( './TimerComponent' );
 
 var Utilities = require( '../../js/TwistUtilities.js' );
 
@@ -15,6 +16,8 @@ var ProjectsStore = require( '../Projects/ProjectsStore' );
 
 var ApplicationActions = require( '../Application/ApplicationActions' );
 var ApplicationStore = require( '../Application/ApplicationStore' );
+
+var Modal = require( '../ModalComponent/ModalComponent' );
 
 var TimeComponent = React.createClass({
 
@@ -27,8 +30,21 @@ var TimeComponent = React.createClass({
 	getInitialState: function() {
         return TimeStore;
 	},
+	/**
+ 	 * Restart an existing timed event
+	 */
+	_StartTimer:function( timer_id ){
+		// Retrieve timer details
+		var timer = TimeStore.getState().times.filter( function(item){if(item.id==timer_id){return item}} )[0];
+		if( timer['todo-item-id'] != ''){
+			this._StartTaskTimer( timer['todo-item-id'] );
+		} else {
+			this._StartTimeEntryTimer( timer['id'] );
+		}
+		// Restart timer
+	},
 	_StartTaskTimer:function( task_id ){
-		ApplicationActions.GetTask( task_id ).then(
+		ApplicationStore.getData().teamwork_api.GetTask( task_id ).then(
 			function( data ){
 				TimeActions.StartTaskTimer( data[ 'todo-item' ] );
 			}
@@ -42,7 +58,15 @@ var TimeComponent = React.createClass({
 		);
 	},
 	_ShowAddForm:function(){
-		TimeEntryAddActions.ShowForm();
+		TimeStore.setState( {show_add_form:true} );
+	},
+	_EditTimeEntry:function( id ){
+		TimeStore.setState( 
+			{
+				show_edit_form:true,
+				current_time_entry_id:id
+			} 
+		);
 	},
 	_SetBillable:function( id, state ){
 
@@ -54,7 +78,6 @@ for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
 	}
 }
 
-
 		ApplicationActions.UpdateTimeEntry(
 			id, 
 			{
@@ -64,6 +87,12 @@ for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
 		).then(
 			TimeStore.UpdateTimes
 		);
+	},
+	_HideAddForm:function(){
+		TimeStore.setState( {show_add_form:false} );
+	},
+	_HideEditForm:function(){
+		TimeStore.setState( {show_edit_form:false} );
 	},
 
 	render: function() {
@@ -109,38 +138,33 @@ if( typeof times_by_day[ date_string ] != 'undefined' ){
 	        		hours += parseInt( time_entry.hours, 10 );
 	        		minutes += parseInt( time_entry.minutes, 10 );
 	        	}
-	        	day.time = ( hours + Math.floor( minutes / 60 ) ).toString() + 'h' + TwistUtilities.ZeroPad( (minutes % 60).toString(), 2 ) + 'm';
+	        	day.time = ( hours + Math.floor( minutes / 60 ) ).toString() + 'h' + Utilities.ZeroPad( (minutes % 60).toString(), 2 ) + 'm';
 	        }
 
 	        var timer = '';
 	        if( TimeStore.getState().current_timer_start_time != null ){
-	        	this.timer_interval = setTimeout( function(){ this.forceUpdate() }.bind(this), 1000 );
-	        	var seconds = moment().unix() - TimeStore.getState().current_timer_start_time.unix();
-	        	var title = '';
-	        	switch( TimeStore.getState().current_timer_type ){
-	        		case 'task':{
-		        		title = TimeStore.getState().current_timer_details.content;
-		        		break;
-	        		}
-	        		case 'time_entry':{
-		        		title = TimeStore.getState().current_timer_details.description;
-		        		break;
-	        		}
-	        	}
-	        	var time = Math.floor( seconds / 3600 ).toString() + ':' + TwistUtilities.ZeroPad(( Math.floor( seconds / 60 ) % 60 ).toString(),2) + ':' + TwistUtilities.ZeroPad((seconds % 60).toString(), 2);
-	        	document.title = time + ' - ' + title;
-	        	timer = <div className="item current_timer">
-	        		<div className="title">{title}</div><div className="timer">{time}</div>
-	        		<div className="buttons">
-		        		<button onTouchTap={TimeActions.StopTimer} className="material-icons">stop</button>
-		        		<button onTouchTap={TimeActions.DeleteTimer}className="material-icons">delete</button>
-		        	</div>
-					<div className="details">{TimeStore.getState().current_timer_details[ 'company-name' ]} / {TimeStore.getState().current_timer_details[ 'project-name' ]} / {TimeStore.getState().current_timer_start_time.format('HH:mm')} -</div>
-	        	</div>;
+	        	var timer = <TimerComponent />
 	        }
 
-
-			list = <div className="days">{timer}{
+	        var button_new = <button className="material-icons">add</button>;
+			var form;
+			if(TimeStore.getState().show_add_form){
+				form = <Modal title="Add a timer" show={true} onClose={this._HideAddForm}>
+				  <TimeEntryAddComponent onSubmit={this._HideAddForm}/>
+				</Modal>
+				;				
+			}
+			if(TimeStore.getState().show_edit_form){
+				form = <Modal title="Edit a timer" show={true} onClose={this._HideEditForm}>
+				  <TimeEntryEditComponent 
+				  	time_entry_id={TimeStore.getState().current_time_entry_id}
+				  	onSubmit={function(){this._HideEditForm();TimeStore.UpdateTimes()}.bind(this)}
+				  />
+				</Modal>
+				;				
+			}
+			
+			list = <div className="days">{
 				days.map(
 					function (item, day_idx) {
 						return <div key={day_idx} className="day">
@@ -154,21 +178,25 @@ if( typeof times_by_day[ date_string ] != 'undefined' ){
 										if( item['todo-item-id' ] != '' ){
 											var title = <a href={ApplicationStore.getData().user_account.URL + 'tasks/' + item['todo-item-id']} target="teamwork">{item['todo-item-name']}</a>;
 										}
+
 										return <div
 											key={time_idx}
 											className="item time-entry">
-												<div className="buttons left">
-													<button className={ "material-icons billable" + ((item.isbillable == "1")?' active':'')} onTouchTap={this._SetBillable.bind(this,item.id,!(item.isbillable=="1"))}>attach_money</button>
-												</div>
 								        		<div className="title">{title}</div>
-								        		<div className="timer">{item['hours'].toString()}h{TwistUtilities.ZeroPad(item['minutes'],2 )}m</div>
+								        		<div className="timer">{item['hours'].toString()}h{Utilities.ZeroPad(item['minutes'],2 )}m</div>
 								        		<div className="buttons">
-									        		<button onTouchTap={this._StartTaskTimer.bind(this, item['todo-item-id'])} className="material-icons">play_arrow</button>
-									        		<button onTouchTap={TimeActions.DeleteTimeEntry.bind(this,item.id)} className="material-icons">delete</button>
+									        		<button onTouchTap={this._StartTimer.bind(this, item['id'])} className="material-icons">access_time</button>
 									        	</div>
 												<div className="details">
 													{item[ 'company-name' ]} / <a href={ApplicationStore.getData().user_account.URL + 'projects/' + item[ 'project-id' ].toString() + '/time'} target="teamwork">{item['project-name']}</a> / {time.format( 'HH:mm' )} - {time.add(item.hours,'hours').add(item.minutes,'minutes').format( 'HH:mm' )}
 												</div>
+								        		<div className="buttons additional">
+													<button className={ "material-icons billable" + ((item.isbillable == "1")?' active':'')} onTouchTap={this._SetBillable.bind(this,item.id,!(item.isbillable=="1"))}>attach_money</button>
+									        		<button onTouchTap={TimeActions.DeleteTimeEntry.bind(this,item.id)} className="material-icons" title="Delete">highlight_off</button>
+									        		<button onTouchTap={this._EditTimeEntry.bind(this, item['id'])} className="material-icons" title="Edit">create</button>
+									        	</div>
+												<div style={{backgroundColor:Utilities.StringToRGB(item['company-name'])}} className="marker"></div>
+												<div style={{backgroundColor:Utilities.StringToRGB(item['project-name'])}} className="marker project"></div>
 											</div>;
 									}.bind( this )
 								)
@@ -183,9 +211,11 @@ if( typeof times_by_day[ date_string ] != 'undefined' ){
 			<div id="time">
 				<div className="header">
 					<h2><a href={ApplicationStore.getData().user_account.URL + 'people/' + ApplicationStore.getData().user_account.userId +'?tabView=time'} target="teamwork">Time</a></h2>
-					<div className="buttons"><button className="material-icons" onTouchTap={this._ShowAddForm}>add</button></div>
+					<div className="buttons"><button onTouchTap={this._ShowAddForm} className="material-icons">add</button></div>
 				</div>
+				{timer}
 				{list}
+				{form}
 			</div>
 		);
 	}

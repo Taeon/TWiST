@@ -29,7 +29,7 @@ module.exports = Reflux.createStore({
         );
     },
     UpdateTasks:function() {
-        ApplicationActions.GetTasks(
+        ApplicationStore.getData().teamwork_api.GetTasks(
             {
                  "responsible-party-ids":ApplicationStore.getData().user_account.userId,
                  'sort': 'dateadded'
@@ -43,6 +43,17 @@ module.exports = Reflux.createStore({
                         tasks_checked: []
                     } 
                 );
+                for( var i = 0; i < this.state.tasks.length; i++ ){
+                    var task = this.state.tasks[ i ];
+                    ApplicationStore.getData().teamwork_api.GetTimeEntriesForTask( task.id ).then(
+                        function( data ){
+                            var returned_task = data.projects[ 0 ].tasklist.task;
+                            var task = this.state.tasks.filter(function(task){if(task.id == returned_task.id){return task}})[0];
+                            task.time_totals = returned_task[ 'time-totals' ];
+                            this.setState({tasks:this.state.tasks});
+                        }.bind(this)
+                    );
+                }
             }.bind(this)
         )
     },

@@ -1,4 +1,3 @@
-/** @jsx React.DOM */
 "use strict";
 
 var React   = require('react');
@@ -15,8 +14,6 @@ var TicketsComponent = require( './TicketsComponent/TicketsComponent' );
 
 var TimeActions = require( './TimeComponent/TimeActions' );
 var TimeComponent = require( './TimeComponent/TimeComponent' );
-
-var TimeEntryAddComponent = require( './TimeEntryAddComponent/TimeEntryAddComponent' );
 
 var ApplicationStore = require( './Application/ApplicationStore' );
 var ApplicationActions = require( './Application/ApplicationActions' );
@@ -79,7 +76,6 @@ var AppContainerComponent = React.createClass(
 				case ApplicationStore.STATE_LOADED:{
 					var layout =
 						<div class="outer">
-							<TimeEntryAddComponent/>
 							<header>
 								<h1 onTouchTap={ApplicationActions.SwitchToTwist}>TWiST</h1>
 								<div className="buttons">

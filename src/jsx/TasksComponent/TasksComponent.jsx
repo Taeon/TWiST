@@ -1,5 +1,3 @@
-/** @jsx React.DOM */
-
 var React   = require('react');
 var Reflux   = require('reflux');
 
@@ -8,8 +6,10 @@ var TasksActions = require( './TasksActions' );
 
 var TimeActions = require( '../TimeComponent/TimeActions' );
 
-var ApplicationActions = require( '../Application/ApplicationActions' );
+var TicketsActions = require( '../TicketsComponent/TicketsActions' );
 var ApplicationStore = require( '../Application/ApplicationStore' );
+
+var Utilities = require( '../../js/TwistUtilities.js' );
 
 var TasksComponent = React.createClass({
 
@@ -26,23 +26,27 @@ var TasksComponent = React.createClass({
         this.unsubscribe();
     },
   
-	getInitialState: function() {
-        return TasksStore;
-	},
 	_StartTaskTimer:function( task_id ){
-		ApplicationActions.GetTask( task_id ).then(
+		ApplicationStore.getData().teamwork_api.GetTask( task_id ).then(
 			function( data ){
 				TimeActions.StartTaskTimer( data[ 'todo-item' ] );
 			}
 		);
 	},
 	_MarkCompleted:function(){
-		if( TasksStore.getState().tasks_checked.length > 0 ){
-			ApplicationActions.SetTasksCompleted(
-				TasksStore.getState().tasks_checked
-			).then(
-				TasksStore.UpdateTasks
-			);
+		var total = TasksStore.getState().tasks_checked.length;
+		if( total > 0 ){
+			var ids = TasksStore.getState().tasks_checked;
+	        for( var i = 0; i < ids.length; i++ ){
+	            ApplicationStore.getData().teamwork_api.SetTaskCompleted( ids[ i ] ).then(
+	                function(){
+	                    total--;
+	                    if( total <= 0 ){
+							TasksStore.UpdateTasks();
+	                    }
+	                }.bind(this)
+	            );
+	        }
 		}
 	},
 	_ToggleChecked:function( id ){
@@ -62,12 +66,11 @@ var TasksComponent = React.createClass({
 	_Reload:function(){
 		TasksActions.UpdateTasks();
 	},
-	ShowTeamworkProject:function(id){
-		ApplicationActions.SwitchToTeamwork( 'projects/' + id.toString() + '/tasks' );
-	},
 	onTaskClick:function( id ){
 alert(id);
 	},
+
+
 
 	render: function() {
 		var list;
@@ -80,10 +83,15 @@ alert(id);
 			} else {
 				inner_content = <div className="tasks-items">{TasksStore.getState().tasks.map(
 					function (item, idx) {
+
+
 						return <div className={"item task " + ((item.priority != '')?this.task_priority_class_names[ item.priority]:'priority-none') }
 							key={idx}>
+								<div style={{backgroundColor:Utilities.StringToRGB(item['company-name'])}} className="marker"></div>
+								<div style={{backgroundColor:Utilities.StringToRGB(item['project-name'])}} className="marker project"></div>
 								<label><input type="checkbox" checked={TasksStore.getState().tasks_checked.indexOf(item.id)!==-1} className="checkbox" onChange={this._ToggleChecked.bind(this,item.id)}/></label>
 								<div className="title"><a href={ApplicationStore.getData().user_account.URL + 'tasks/' + item.id.toString() } target="teamwork">{item.content}</a></div>
+								<div className={"time" + ((typeof item.time_totals != 'undefined' && parseInt( item.time_totals['total-mins-sum'], 10 ) > 0)?' logged':'')}>{(typeof item.time_totals != 'undefined')?'' + Utilities.MinutesToTime( item.time_totals['total-mins-sum'] ):''}</div>
 								<div className="details">
 									{item['company-name']} / <a href={ApplicationStore.getData().user_account.URL + 'projects/' + item[ 'project-id' ].toString() + '/tasks'} target="teamwork">{item['project-name']}</a> / <a href={ApplicationStore.getData().user_account.URL + 'tasklists/' + item[ 'todo-list-id' ].toString()} target="teamwork">{item['todo-list-name']}</a>
 								</div>
@@ -98,11 +106,10 @@ alert(id);
 			}
 		}
 
-	
 		return (
 			<div id="tasks">
 				<div className="header">
-					<h2><a href={ApplicationStore.getData().user_account.URL + 'people/' + ApplicationStore.getData().user_account.userId +'?tabView=tasks'} target="teamwork">Tasks</a></h2>
+					<h2><a href={ApplicationStore.getData().user_account.URL + 'people/' + ApplicationStore.getData().user_account.userId +'?tabView=tasks'} target="teamwork">Tasks [{TasksStore.getState().tasks.length}]</a></h2>
 					<div className="buttons"><button className="material-icons" onTouchTap={this._Reload}>replay</button><button className="material-icons">add</button></div>
 					<div className="options"><div className="buttons"><button className="material-icons" onTouchTap={this._MarkCompleted}>done_all</button></div></div>
 				</div>
