@@ -53,6 +53,18 @@ module.exports = Reflux.createStore({
                             this.setState({tasks:this.state.tasks});
                         }.bind(this)
                     );
+                    task.tickets = [];
+                    if( task.hasTickets ){
+                        ApplicationStore.getData().teamwork_desk_api.GetTicketsForTask( task.id ).then(
+                            function( id, data ){
+                                var task = this.state.tasks.filter(function(task){if(task.id == id){return task}})[0];
+                                if( data.count > 0 ){
+                                    task.tickets = data.tickets;
+                                    this.setState({tasks:this.state.tasks});
+                                }
+                            }.bind(this, task.id)
+                        );
+                    }
                 }
             }.bind(this)
         )

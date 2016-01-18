@@ -97,49 +97,52 @@ for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
 
 	render: function() {
 		var list;
-		if( TimeStore.getState().status == TimeStore.STATE_LOADING || TimeStore.getState().times.length == 0 ){
+		if( TimeStore.getState().status == TimeStore.STATE_LOADING ){
 			list = <div className="waiting">...</div>;
 		} else {
 
 			var times_by_day = {};
-	        for( var i = 0; i < 7; i++ ){
-		        var date = moment();
-		        date.subtract( i, 'days' );
-		        times_by_day[date.format( 'YYYYMMDD' )] = {
-		        	date: date,
-		        	time: 0,
-		        	time_entries: []
-		        };
-	        }
-
-	        var time_entry;
-	        for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
-	        	var date = moment( time_entry.date );
-	        	var date_string = date.format( 'YYYYMMDD' );
-if( typeof times_by_day[ date_string ] != 'undefined' ){
-	        	times_by_day[ date_string ].time_entries.push( time_entry )
-
-}
-	        }
-	        var days = [];
-	        for( var i = 0; i < 7; i++ ){
-		        var date = moment();
-		        date.subtract( i, 'days' );
-		        var index = date.format( 'YYYYMMDD' );
-	        	if( times_by_day[ index ].time_entries.length > 0 ){
-		        	days.push( times_by_day[ index ] );
-	        	}
-	        };
-
-	        for( var d = 0; day = days[ d ]; d++ ){
-	        	var hours = 0;
-	        	var minutes = 0;
-	        	for( var t = 0; time_entry = day.time_entries[ t ]; t++ ){
-	        		hours += parseInt( time_entry.hours, 10 );
-	        		minutes += parseInt( time_entry.minutes, 10 );
-	        	}
-	        	day.time = ( hours + Math.floor( minutes / 60 ) ).toString() + 'h' + Utilities.ZeroPad( (minutes % 60).toString(), 2 ) + 'm';
-	        }
+			var days = [];
+			if( ( typeof TimeStore.getState().times != 'undefined' && TimeStore.getState().times.length > 0 ) ){
+				for( var i = 0; i < 7; i++ ){
+					var date = moment();
+					date.subtract( i, 'days' );
+					times_by_day[date.format( 'YYYYMMDD' )] = {
+						date: date,
+						time: 0,
+						time_entries: []
+					};
+				}
+	
+				var time_entry;
+				for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
+					var date = moment( time_entry.date );
+					var date_string = date.format( 'YYYYMMDD' );
+	if( typeof times_by_day[ date_string ] != 'undefined' ){
+					times_by_day[ date_string ].time_entries.push( time_entry )
+	
+	}
+				}
+				var days = [];
+				for( var i = 0; i < 7; i++ ){
+					var date = moment();
+					date.subtract( i, 'days' );
+					var index = date.format( 'YYYYMMDD' );
+					if( times_by_day[ index ].time_entries.length > 0 ){
+						days.push( times_by_day[ index ] );
+					}
+				};
+	
+				for( var d = 0; day = days[ d ]; d++ ){
+					var hours = 0;
+					var minutes = 0;
+					for( var t = 0; time_entry = day.time_entries[ t ]; t++ ){
+						hours += parseInt( time_entry.hours, 10 );
+						minutes += parseInt( time_entry.minutes, 10 );
+					}
+					day.time = ( hours + Math.floor( minutes / 60 ) ).toString() + 'h' + Utilities.ZeroPad( (minutes % 60).toString(), 2 ) + 'm';
+				}
+			}
 
 	        var timer = '';
 	        if( TimeStore.getState().current_timer_start_time != null ){

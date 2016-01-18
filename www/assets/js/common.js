@@ -4574,7 +4574,7 @@ DELETE /tags/{tag_id}.json
 	}
 
 	/**
-	 * Task ID
+	 * Get tickets for task
 	 * http://developer.teamwork.com/desk/#!/tickets/Task_ID
 	 * 
 	 * @param		int		taskId
@@ -4582,7 +4582,7 @@ DELETE /tags/{tag_id}.json
 	 *
 	 * @return	object			promises	Object with promise methods
 	 */
-	TW.prototype.GetTask = function ( taskId, options ){
+	TW.prototype.GetTicketsForTask = function ( taskId, options ){
 		return Get(
 			this,
 			BuildPath( 'v1/tickets/task/{taskId}', {taskId:taskId} ),
@@ -4753,6 +4753,23 @@ DELETE /tags/{tag_id}.json
 		return Delete(
 			this,
 			BuildPath( 'v1/tickets/bulkdelete', {} ),
+			options
+		);
+	}
+	
+	/**
+	 * Set task ID on a ticket
+	 * 
+	 * @param		int		ticket_id
+	 * @param		int		task_id
+	 * @param		object		options		Options to pass on request
+	 *
+	 * @return	object			promises	Object with promise methods
+	 */
+	TW.prototype.SetTicketTaskID= function ( ticket_id, task_id, options ){
+		return Post(
+			this,
+			BuildPath( 'v1/tickets/{ticketId}/task/{taskId}', {taskId:task_id,ticketId:ticket_id} ),
 			options
 		);
 	}
@@ -46971,6 +46988,7 @@ var Reflux = require('reflux');
 var Actions = Reflux.createActions([
     'SetAPIKey',
     'ClearAPIKey',
+    'SetEmailToProjectLookup',
     'Set',
     'Delete'
 ]);
@@ -47033,6 +47051,38 @@ module.exports = Reflux.createStore({
             }
         );
     },
+    /**
+     * Used when creating a new task for a ticket, to get 
+     *
+     * @param       string      email
+     * @param       int         project_id
+     */
+    SetEmailToProjectLookup:function( email, project_id ){
+        var lookup = this.Get( 'email_project_id_lookup' );
+        if( typeof lookup == 'undefined' ){
+            lookup = {};
+        }
+        lookup[email] = project_id;
+        this.Set( 'email_project_id_lookup', lookup );
+    },
+    GetEmailToProjectLookup:function( email ){
+        var lookup = this.Get( 'email_project_id_lookup' );
+        if( typeof lookup != 'undefined' ){
+            if( typeof lookup[ email ] != 'undefined' ){
+                return lookup[ email ];
+            }
+        }
+        return null;
+    },
+    Get:function( key ){
+        return this.getData()[ key ];
+    },
+    /**
+     * Set an arbitrary value
+     *
+     * @param       string      key
+     * @param       mixed       value
+     */
     Set:function( key, value ){
         var data = {};
         data[ key ] = value;
@@ -47353,6 +47403,12 @@ alert(id);
 				inner_content = React.createElement("div", {className: "tasks-items"}, TasksStore.getState().tasks.map(
 					function (item, idx) {
 
+						var buttons = false;
+	        			if( typeof item.tickets != 'undefined' && item.tickets.length > 0 ){
+	        				var buttons = React.createElement("div", {className: "buttons additional"}, 
+									React.createElement("a", {href: ApplicationStore.getData().user_account.URL + 'desk/#/tickets/' + item.tickets[ 0 ][ 'id' ].toString(), target: "teamwork-desk", className: "button material-icons", title: "View ticket"}, "email")
+					        	);
+	        			}
 
 						return React.createElement("div", {className: "item task " + ((item.priority != '')?this.task_priority_class_names[ item.priority]:'priority-none'), 
 							key: idx}, 
@@ -47367,7 +47423,8 @@ alert(id);
 								React.createElement("div", {className: "description"}, item['description']), 
 				        		React.createElement("div", {className: "buttons"}, 
 					        		React.createElement("button", {onTouchTap: this._StartTaskTimer.bind(this, item.id), className: "material-icons"}, "access_time")
-					        	)
+					        	), 
+					        	buttons
 							);
 					}.bind(this)
 					
@@ -47487,6 +47544,18 @@ module.exports = Reflux.createStore({
                             this.setState({tasks:this.state.tasks});
                         }.bind(this)
                     );
+                    task.tickets = [];
+                    if( task.hasTickets ){
+                        ApplicationStore.getData().teamwork_desk_api.GetTicketsForTask( task.id ).then(
+                            function( id, data ){
+                                var task = this.state.tasks.filter(function(task){if(task.id == id){return task}})[0];
+                                if( data.count > 0 ){
+                                    task.tickets = data.tickets;
+                                    this.setState({tasks:this.state.tasks});
+                                }
+                            }.bind(this, task.id)
+                        );
+                    }
                 }
             }.bind(this)
         )
@@ -47508,6 +47577,9 @@ var
 
 var TimeActions = require( '../TimeComponent/TimeActions' );
 var TasksActions = require(  '../TasksComponent/TasksActions' );
+
+var LocalStorageActions = require(  '../LocalStorage/LocalStorageActions' );
+var LocalStorageStore = require(  '../LocalStorage/LocalStorageStore' );
 
 var TwistUtilities = require( '../../js/TwistUtilities' );
 
@@ -47570,12 +47642,16 @@ var Component = React.createClass({displayName: "Component",
 		this.forceUpdate();
 	},
 	componentWillMount: function() {
+    	this.ResetValues();
 		ApplicationStore.getData().teamwork_desk_api.GetTicket( 
 			this.props.ticket_id
 		).then(
 			function( data ){
 				var ticket = data.ticket;
-
+				var project_id = LocalStorageStore.GetEmailToProjectLookup( ticket.customer.email );
+				if( project_id != null ){
+					this.onChange( {project_id:project_id} );
+				}
 				value.content = ticket.subject + ' (#' + ticket.id + ')';
 				this.setState( {
 					status:this.STATUS_LOADED,
@@ -47585,6 +47661,7 @@ var Component = React.createClass({displayName: "Component",
 		)
     },
     componentWillUnmount: function() {
+    	this.ResetValues();
     },
 	onSubmit:function(){
 		var task = {
@@ -47599,13 +47676,33 @@ var Component = React.createClass({displayName: "Component",
 			value.task_list_id,
 		 	{'todo-item':task}
 		 ).then(
-		 	function(){
-		 		TasksActions.UpdateTasks();
-		 	}
+		 	function( task ){
+				setTimeout(
+					function(){
+						ApplicationStore.getData().teamwork_desk_api.SetTicketTaskID(
+							this.state.ticket.id,
+							task.id
+						).then(
+							function(){
+								TasksActions.UpdateTasks();
+							}.bind(this)
+						);					
+					}.bind(this),
+					1000
+					
+				)
+		 	}.bind(this)
 		 );
+
+		LocalStorageActions.SetEmailToProjectLookup( this.state.ticket.customer.email, value.project_id );
 
 		if( typeof this.props.onSubmit == 'function' ){
 		 	this.props.onSubmit();
+		}
+	},
+	ResetValues:function(){
+		for( var index in value ){
+			value[ index ] = '';
 		}
 	},
 	onChange:function( new_values ){
@@ -47617,6 +47714,8 @@ var Component = React.createClass({displayName: "Component",
 			 	new_values.project_id
 			 ).then(
 			 	function( data ){
+			 		value.task_list_id = '';
+			 		this.refs.task_list_id.setState( {value:''} )
 			 		this.setState( {task_lists:data.tasklists} );
 			 	}.bind(this)
 			 );
@@ -47695,8 +47794,8 @@ var Component = React.createClass({displayName: "Component",
 						      defaultValue: value.task_list_id, 
 						      textField: "name", 
 						      valueField: "id", 
-						      onChange: function(task_list){if(typeof task_list == 'object' ){this.onChange({task_list_id:task_list.id})}}.bind(this), 
-						      filter: "contains"}
+						      ref: "task_list_id", 
+						      onChange: function(task_list){if(typeof task_list == 'object' ){this.onChange({task_list_id:task_list.id})}}.bind(this)}
 						      ), 
 					    React.createElement(Form.Message, {for: "task_list_id"})
 				    ), 
@@ -47721,7 +47820,7 @@ var Component = React.createClass({displayName: "Component",
 
 
 module.exports = Component;
-},{"../../js/TwistUtilities":336,"../Application/ApplicationStore":339,"../Projects/ProjectsStore":351,"../TasksComponent/TasksActions":352,"../TimeComponent/TimeActions":361,"moment":6,"react":292,"react-formal":14,"react-formal-inputs":7,"react-widgets":71,"reflux":293,"yup":316}],357:[function(require,module,exports){
+},{"../../js/TwistUtilities":336,"../Application/ApplicationStore":339,"../LocalStorage/LocalStorageActions":341,"../LocalStorage/LocalStorageStore":343,"../Projects/ProjectsStore":351,"../TasksComponent/TasksActions":352,"../TimeComponent/TimeActions":361,"moment":6,"react":292,"react-formal":14,"react-formal-inputs":7,"react-widgets":71,"reflux":293,"yup":316}],357:[function(require,module,exports){
 'use strict';
 
 var Reflux = require('reflux');
@@ -48126,49 +48225,52 @@ for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
 
 	render: function() {
 		var list;
-		if( TimeStore.getState().status == TimeStore.STATE_LOADING || TimeStore.getState().times.length == 0 ){
+		if( TimeStore.getState().status == TimeStore.STATE_LOADING ){
 			list = React.createElement("div", {className: "waiting"}, "...");
 		} else {
 
 			var times_by_day = {};
-	        for( var i = 0; i < 7; i++ ){
-		        var date = moment();
-		        date.subtract( i, 'days' );
-		        times_by_day[date.format( 'YYYYMMDD' )] = {
-		        	date: date,
-		        	time: 0,
-		        	time_entries: []
-		        };
-	        }
-
-	        var time_entry;
-	        for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
-	        	var date = moment( time_entry.date );
-	        	var date_string = date.format( 'YYYYMMDD' );
-if( typeof times_by_day[ date_string ] != 'undefined' ){
-	        	times_by_day[ date_string ].time_entries.push( time_entry )
-
-}
-	        }
-	        var days = [];
-	        for( var i = 0; i < 7; i++ ){
-		        var date = moment();
-		        date.subtract( i, 'days' );
-		        var index = date.format( 'YYYYMMDD' );
-	        	if( times_by_day[ index ].time_entries.length > 0 ){
-		        	days.push( times_by_day[ index ] );
-	        	}
-	        };
-
-	        for( var d = 0; day = days[ d ]; d++ ){
-	        	var hours = 0;
-	        	var minutes = 0;
-	        	for( var t = 0; time_entry = day.time_entries[ t ]; t++ ){
-	        		hours += parseInt( time_entry.hours, 10 );
-	        		minutes += parseInt( time_entry.minutes, 10 );
-	        	}
-	        	day.time = ( hours + Math.floor( minutes / 60 ) ).toString() + 'h' + Utilities.ZeroPad( (minutes % 60).toString(), 2 ) + 'm';
-	        }
+			var days = [];
+			if( ( typeof TimeStore.getState().times != 'undefined' && TimeStore.getState().times.length > 0 ) ){
+				for( var i = 0; i < 7; i++ ){
+					var date = moment();
+					date.subtract( i, 'days' );
+					times_by_day[date.format( 'YYYYMMDD' )] = {
+						date: date,
+						time: 0,
+						time_entries: []
+					};
+				}
+	
+				var time_entry;
+				for( var i = 0; time_entry = TimeStore.getState().times[ i ]; i++ ){
+					var date = moment( time_entry.date );
+					var date_string = date.format( 'YYYYMMDD' );
+	if( typeof times_by_day[ date_string ] != 'undefined' ){
+					times_by_day[ date_string ].time_entries.push( time_entry )
+	
+	}
+				}
+				var days = [];
+				for( var i = 0; i < 7; i++ ){
+					var date = moment();
+					date.subtract( i, 'days' );
+					var index = date.format( 'YYYYMMDD' );
+					if( times_by_day[ index ].time_entries.length > 0 ){
+						days.push( times_by_day[ index ] );
+					}
+				};
+	
+				for( var d = 0; day = days[ d ]; d++ ){
+					var hours = 0;
+					var minutes = 0;
+					for( var t = 0; time_entry = day.time_entries[ t ]; t++ ){
+						hours += parseInt( time_entry.hours, 10 );
+						minutes += parseInt( time_entry.minutes, 10 );
+					}
+					day.time = ( hours + Math.floor( minutes / 60 ) ).toString() + 'h' + Utilities.ZeroPad( (minutes % 60).toString(), 2 ) + 'm';
+				}
+			}
 
 	        var timer = '';
 	        if( TimeStore.getState().current_timer_start_time != null ){

@@ -10,6 +10,9 @@ var
 var TimeActions = require( '../TimeComponent/TimeActions' );
 var TasksActions = require(  '../TasksComponent/TasksActions' );
 
+var LocalStorageActions = require(  '../LocalStorage/LocalStorageActions' );
+var LocalStorageStore = require(  '../LocalStorage/LocalStorageStore' );
+
 var TwistUtilities = require( '../../js/TwistUtilities' );
 
 var Form = require('react-formal'), 
@@ -71,12 +74,16 @@ var Component = React.createClass({
 		this.forceUpdate();
 	},
 	componentWillMount: function() {
+    	this.ResetValues();
 		ApplicationStore.getData().teamwork_desk_api.GetTicket( 
 			this.props.ticket_id
 		).then(
 			function( data ){
 				var ticket = data.ticket;
-
+				var project_id = LocalStorageStore.GetEmailToProjectLookup( ticket.customer.email );
+				if( project_id != null ){
+					this.onChange( {project_id:project_id} );
+				}
 				value.content = ticket.subject + ' (#' + ticket.id + ')';
 				this.setState( {
 					status:this.STATUS_LOADED,
@@ -86,6 +93,7 @@ var Component = React.createClass({
 		)
     },
     componentWillUnmount: function() {
+    	this.ResetValues();
     },
 	onSubmit:function(){
 		var task = {
@@ -100,13 +108,33 @@ var Component = React.createClass({
 			value.task_list_id,
 		 	{'todo-item':task}
 		 ).then(
-		 	function(){
-		 		TasksActions.UpdateTasks();
-		 	}
+		 	function( task ){
+				setTimeout(
+					function(){
+						ApplicationStore.getData().teamwork_desk_api.SetTicketTaskID(
+							this.state.ticket.id,
+							task.id
+						).then(
+							function(){
+								TasksActions.UpdateTasks();
+							}.bind(this)
+						);					
+					}.bind(this),
+					1000
+					
+				)
+		 	}.bind(this)
 		 );
+
+		LocalStorageActions.SetEmailToProjectLookup( this.state.ticket.customer.email, value.project_id );
 
 		if( typeof this.props.onSubmit == 'function' ){
 		 	this.props.onSubmit();
+		}
+	},
+	ResetValues:function(){
+		for( var index in value ){
+			value[ index ] = '';
 		}
 	},
 	onChange:function( new_values ){
@@ -118,6 +146,8 @@ var Component = React.createClass({
 			 	new_values.project_id
 			 ).then(
 			 	function( data ){
+			 		value.task_list_id = '';
+			 		this.refs.task_list_id.setState( {value:''} )
 			 		this.setState( {task_lists:data.tasklists} );
 			 	}.bind(this)
 			 );
@@ -196,8 +226,8 @@ var Component = React.createClass({
 						      defaultValue={value.task_list_id}
 						      textField='name' 
 						      valueField='id'
+						      ref='task_list_id'
 						      onChange={function(task_list){if(typeof task_list == 'object' ){this.onChange({task_list_id:task_list.id})}}.bind(this)}
-						      filter='contains'
 						      />
 					    <Form.Message for='task_list_id'/>
 				    </div>

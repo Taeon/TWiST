@@ -84,6 +84,12 @@ alert(id);
 				inner_content = <div className="tasks-items">{TasksStore.getState().tasks.map(
 					function (item, idx) {
 
+						var buttons = false;
+	        			if( typeof item.tickets != 'undefined' && item.tickets.length > 0 ){
+	        				var buttons = <div className="buttons additional">
+									<a href={ApplicationStore.getData().user_account.URL + 'desk/#/tickets/' + item.tickets[ 0 ][ 'id' ].toString() } target="teamwork-desk" className="button material-icons" title="View ticket">email</a>
+					        	</div>;
+	        			}
 
 						return <div className={"item task " + ((item.priority != '')?this.task_priority_class_names[ item.priority]:'priority-none') }
 							key={idx}>
@@ -99,6 +105,7 @@ alert(id);
 				        		<div className="buttons">
 					        		<button onTouchTap={this._StartTaskTimer.bind(this, item.id)} className="material-icons">access_time</button>
 					        	</div>
+					        	{buttons}
 							</div>;
 					}.bind(this)
 					

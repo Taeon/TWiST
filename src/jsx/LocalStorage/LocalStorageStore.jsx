@@ -30,6 +30,38 @@ module.exports = Reflux.createStore({
             }
         );
     },
+    /**
+     * Used when creating a new task for a ticket, to get 
+     *
+     * @param       string      email
+     * @param       int         project_id
+     */
+    SetEmailToProjectLookup:function( email, project_id ){
+        var lookup = this.Get( 'email_project_id_lookup' );
+        if( typeof lookup == 'undefined' ){
+            lookup = {};
+        }
+        lookup[email] = project_id;
+        this.Set( 'email_project_id_lookup', lookup );
+    },
+    GetEmailToProjectLookup:function( email ){
+        var lookup = this.Get( 'email_project_id_lookup' );
+        if( typeof lookup != 'undefined' ){
+            if( typeof lookup[ email ] != 'undefined' ){
+                return lookup[ email ];
+            }
+        }
+        return null;
+    },
+    Get:function( key ){
+        return this.getData()[ key ];
+    },
+    /**
+     * Set an arbitrary value
+     *
+     * @param       string      key
+     * @param       mixed       value
+     */
     Set:function( key, value ){
         var data = {};
         data[ key ] = value;
